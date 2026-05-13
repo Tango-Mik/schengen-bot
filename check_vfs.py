@@ -46,7 +46,3 @@ def check_vfs(country):
 
         return True
 
-
-# TEMP TEST
-print("France:", check_vfs("france"))
-print("Italy:", check_vfs("italy"))
