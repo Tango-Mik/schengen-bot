@@ -11,23 +11,35 @@ def check_vfs(country):
         page = browser.new_page()
 
         page.goto(URLS[country], wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(10000)
+        page.wait_for_timeout(8000)
 
         html = page.content().lower()
-        browser.close()
 
+        # ✅ 1. Strong NO-SLOT signals
         blocked_phrases = [
             "no appointment",
             "fully booked",
             "no slots",
             "currently unavailable",
-            "no available",
             "try again later"
         ]
 
         for phrase in blocked_phrases:
             if phrase in html:
+                browser.close()
                 return False
 
-        # ✅ Always assume NO slots unless very sure
-        return False
+        # ✅ 2. SMART SIGNAL: Look for booking button
+        try:
+            button = page.locator("button:has-text('book')")
+            if button.count() > 0:
+                # Check if button is enabled
+                if button.first.is_enabled():
+                    browser.close()
+                    return True   # strong positive signal
+        except:
+            pass
+
+        # ✅ 3. SMART SIGNAL: Navigation change
+        current_url = page.url
+        if "appointment" in current_url:
