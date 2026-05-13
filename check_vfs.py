@@ -2,6 +2,7 @@ from playwright.sync_api import sync_playwright
 import hashlib
 import json
 import re
+import difflib
 
 URLS = {
     "france": "https://visa.vfsglobal.com/are/en/fra/book-an-appointment",
@@ -10,44 +11,39 @@ URLS = {
     "netherlands": "https://visa.vfsglobal.com/are/en/nld/book-an-appointment"
 }
 
-# ✅ Extract only meaningful visible content
-def extract_important_content(html):
-
+# ✅ Extract meaningful content
+def extract_content(html):
     html = html.lower()
-
-    # remove scripts
     html = re.sub(r"<script.*?>.*?</script>", "", html, flags=re.DOTALL)
-
-    # remove styles
     html = re.sub(r"<style.*?>.*?</style>", "", html, flags=re.DOTALL)
-
-    # remove comments
     html = re.sub(r"<!--.*?-->", "", html, flags=re.DOTALL)
 
     important = []
-
-    # ✅ headings
     important += re.findall(r"<h[1-6].*?>(.*?)</h[1-6]>", html)
-
-    # ✅ buttons
     important += re.findall(r"<button.*?>(.*?)</button>", html)
-
-    # ✅ links
     important += re.findall(r"<a.*?>(.*?)</a>", html)
-
-    # ✅ paragraphs
     important += re.findall(r"<p.*?>(.*?)</p>", html)
 
     content = " ".join(important)
-
-    # clean whitespace
     content = re.sub(r"\s+", " ", content)
 
     return content.strip()
 
 
-def get_hash(content):
-    return hashlib.md5(content.encode()).hexdigest()
+# ✅ Generate readable diff
+def generate_diff(old, new):
+    old_words = old.split()
+    new_words = new.split()
+
+    diff = list(difflib.ndiff(old_words, new_words))
+
+    added = [w[2:] for w in diff if w.startswith('+ ')]
+    removed = [w[2:] for w in diff if w.startswith('- ')]
+
+    added_text = " ".join(added[:20])   # limit size
+    removed_text = " ".join(removed[:20])
+
+    return added_text, removed_text
 
 
 def check_vfs(country):
@@ -61,30 +57,33 @@ def check_vfs(country):
         html = page.content()
         browser.close()
 
-        # ✅ Filter important content only
-        filtered = extract_important_content(html)
-
-        current_hash = get_hash(filtered)
+        current_content = extract_content(html)
 
         # ✅ Load state
         with open("state.json", "r") as f:
             state = json.load(f)
 
-        key = f"{country}_hash"
-        previous_hash = state.get(key, "")
+        key_content = f"{country}_content"
+        previous_content = state.get(key_content, "")
 
-        # ✅ First run → baseline
-        if previous_hash == "":
-            state[key] = current_hash
+        # ✅ First run
+        if previous_content == "":
+            state[key_content] = current_content
             with open("state.json", "w") as f:
                 json.dump(state, f)
-            return False
+            return None
 
-        # ✅ Detect meaningful change
-        if current_hash != previous_hash:
-            state[key] = current_hash
+        # ✅ Detect change
+        if current_content != previous_content:
+            added, removed = generate_diff(previous_content, current_content)
+
+            state[key_content] = current_content
             with open("state.json", "w") as f:
                 json.dump(state, f)
-            return True
 
-        return False
+            return {
+                "added": added,
+                "removed": removed
+            }
+
+        return None
