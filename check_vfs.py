@@ -1,9 +1,14 @@
 from playwright.sync_api import sync_playwright
+import hashlib
+import json
 
 URLS = {
     "france": "https://visa.vfsglobal.com/are/en/fra/book-an-appointment",
     "italy": "https://visa.vfsglobal.com/dxb/en/ita/book-an-appointment"
 }
+
+def get_page_hash(html):
+    return hashlib.md5(html.encode()).hexdigest()
 
 def check_vfs(country):
     with sync_playwright() as p:
@@ -13,53 +18,31 @@ def check_vfs(country):
         page.goto(URLS[country], wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(8000)
 
-        initial_url = page.url
         html = page.content().lower()
-
-        # ✅ STEP 1: strong NO-slot detection
-        blocked = [
-            "no appointment",
-            "fully booked",
-            "no slots",
-            "currently unavailable",
-            "try again later"
-        ]
-        for b in blocked:
-            if b in html:
-                browser.close()
-                return False
-
-        # ✅ STEP 2: try clicking ANY booking-related button
-        try:
-            buttons = page.locator("button")
-            count = buttons.count()
-
-            for i in range(count):
-                text = buttons.nth(i).inner_text().lower()
-
-                if "book" in text or "appointment" in text:
-                    try:
-                        buttons.nth(i).click(timeout=3000)
-                        page.wait_for_timeout(5000)
-
-                        new_url = page.url
-                        new_html = page.content().lower()
-
-                        # ✅ If page changes → strong signal
-                        if new_url != initial_url:
-                            browser.close()
-                            return True
-
-                        # ✅ If login / appointment page detected
-                        if "login" in new_html or "calendar" in new_html:
-                            browser.close()
-                            return True
-
-                    except:
-                        continue
-
-        except:
-            pass
-
         browser.close()
+
+        current_hash = get_page_hash(html)
+
+        # ✅ Load previous state
+        with open("state.json", "r") as f:
+            state = json.load(f)
+
+        key = f"{country}_hash"
+        previous_hash = state.get(key, "")
+
+        # ✅ Compare hashes
+        if previous_hash == "":
+            # First run → just store
+            state[key] = current_hash
+            with open("state.json", "w") as f:
+                json.dump(state, f)
+            return False
+
+        if current_hash != previous_hash:
+            # ✅ CHANGE DETECTED
+            state[key] = current_hash
+            with open("state.json", "w") as f:
+                json.dump(state, f)
+            return True
+
         return False
