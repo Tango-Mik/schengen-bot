@@ -13,33 +13,51 @@ def check_vfs(country):
         page.goto(URLS[country], wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(8000)
 
+        initial_url = page.url
         html = page.content().lower()
 
-        # ✅ Strong NO-slot signals
-        blocked_phrases = [
+        # ✅ STEP 1: strong NO-slot detection
+        blocked = [
             "no appointment",
             "fully booked",
             "no slots",
             "currently unavailable",
             "try again later"
         ]
-
-        for phrase in blocked_phrases:
-            if phrase in html:
+        for b in blocked:
+            if b in html:
                 browser.close()
                 return False
 
-        # ✅ Smart signal: check if "book" button exists and is enabled
+        # ✅ STEP 2: try clicking ANY booking-related button
         try:
             buttons = page.locator("button")
             count = buttons.count()
 
             for i in range(count):
                 text = buttons.nth(i).inner_text().lower()
-                if "book" in text:
-                    if buttons.nth(i).is_enabled():
-                        browser.close()
-                        return True
+
+                if "book" in text or "appointment" in text:
+                    try:
+                        buttons.nth(i).click(timeout=3000)
+                        page.wait_for_timeout(5000)
+
+                        new_url = page.url
+                        new_html = page.content().lower()
+
+                        # ✅ If page changes → strong signal
+                        if new_url != initial_url:
+                            browser.close()
+                            return True
+
+                        # ✅ If login / appointment page detected
+                        if "login" in new_html or "calendar" in new_html:
+                            browser.close()
+                            return True
+
+                    except:
+                        continue
+
         except:
             pass
 
