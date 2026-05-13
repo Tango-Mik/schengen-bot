@@ -2,33 +2,53 @@ name: Schengen Bot
 
 on:
   schedule:
-    - cron: "*/20 * * * *"
-  workflow_dispatch:
+    - cron: "*/20 * * * *"   # runs every 20 minutes
+  workflow_dispatch:          # allows manual run
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
 
     steps:
+      # ✅ Step 1: Checkout repo
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      # ✅ Step 2: Setup Python
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install dependencies
+      # ✅ Step 3: Install dependencies
+      - name: Install Python packages
         run: |
           pip install -r requirements.txt
 
-      - name: Install Playwright browsers
+      # ✅ Step 4: Install Playwright browsers + system deps
+      - name: Install Playwright
         run: |
-          playwright install
+          playwright install --with-deps
 
+      # ✅ Step 5: Ensure latest repo state (important for state.json)
+      - name: Pull latest changes
+        run: |
+          git pull
+
+      # ✅ Step 6: Run your bot
       - name: Run bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: |
           python main.py
+
+      # ✅ Step 7: Save updated state.json back to repo
+      - name: Save updated state
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add state.json
+          git commit -m "Update state" || echo "No changes to commit"
+          git push
+``
