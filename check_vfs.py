@@ -11,12 +11,12 @@ def check_vfs(country):
         page = browser.new_page()
 
         page.goto(URLS[country], wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(8000)
+        page.wait_for_timeout(10000)
 
         html = page.content().lower()
         browser.close()
 
-        # ✅ Common "no slots" indicators
+        # ✅ STRONG "NO SLOT" CONDITIONS (primary)
         blocked_phrases = [
             "no appointment",
             "fully booked",
@@ -30,19 +30,7 @@ def check_vfs(country):
             if phrase in html:
                 return False
 
-        # ✅ EXTRA: Italy-specific safeguard
-        if country == "italy":
-            if "welcome to vfs global" in html:
-                return False
-            if "apply for a visa" in html:
-                return False
-            if "book an appointment" in html:
-                return False
-
-        # ✅ EXTRA: France safeguard
-        if country == "france":
-            if "book an appointment" in html:
-                return False
-
-        return True
-
+        # ✅ IMPORTANT: FAIL-SAFE DEFAULT
+        # If we are not 100% sure → assume NO SLOT
+        return False
+``
