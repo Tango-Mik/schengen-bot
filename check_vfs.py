@@ -16,7 +16,6 @@ def check_vfs(country):
         html = page.content().lower()
         browser.close()
 
-        # ✅ STRONG "NO SLOT" CONDITIONS (primary)
         blocked_phrases = [
             "no appointment",
             "fully booked",
@@ -30,7 +29,5 @@ def check_vfs(country):
             if phrase in html:
                 return False
 
-        # ✅ IMPORTANT: FAIL-SAFE DEFAULT
-        # If we are not 100% sure → assume NO SLOT
+        # ✅ Always assume NO slots unless very sure
         return False
-``
