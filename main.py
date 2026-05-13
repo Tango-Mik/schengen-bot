@@ -15,7 +15,7 @@ def check_country(country):
         available = check_vfs(country)
 
         if available and state[country] == "no_slots":
-            notify(f"✅ {country.upper()} appointment MAY be available!")
+            notify(f"🚨 CHANGE DETECTED on {country.upper()} booking page!")
             state[country] = "slots_available"
 
         if not available:
