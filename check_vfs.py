@@ -10,28 +10,31 @@ URLS = {
     "netherlands": "https://visa.vfsglobal.com/are/en/nld/book-an-appointment"
 }
 
-# ✅ Extract meaningful content
+# ✅ CLEAN + EXTRACT
 def extract_content(html):
     html = html.lower()
 
+    # remove noise blocks
     html = re.sub(r"<script.*?>.*?</script>", "", html, flags=re.DOTALL)
     html = re.sub(r"<style.*?>.*?</style>", "", html, flags=re.DOTALL)
     html = re.sub(r"<!--.*?-->", "", html, flags=re.DOTALL)
 
-    important = []
-    important += re.findall(r"<h[1-6].*?>(.*?)</h[1-6]>", html)
-    important += re.findall(r"<button.*?>(.*?)</button>", html)
-    important += re.findall(r"<a.*?>(.*?)</a>", html)
-    important += re.findall(r"<p.*?>(.*?)</p>", html)
+    parts = []
+    parts += re.findall(r"<h[1-6].*?>(.*?)</h[1-6]>", html)
+    parts += re.findall(r"<button.*?>(.*?)</button>", html)
+    parts += re.findall(r"<p.*?>(.*?)</p>", html)
+    parts += re.findall(r"<a.*?>(.*?)</a>", html)
 
-    content = " ".join(important)
+    content = " ".join(parts)
 
-    # ✅ Remove noise
-    noise_keywords = [
-        "cookie","privacy","consent","gdpr","preference","accept","reject","policy"
+    # ✅ REMOVE COOKIES / PRIVACY / GENERIC UI
+    noise = [
+        "cookie","privacy","consent","gdpr","preference",
+        "accept","reject","policy","terms","conditions"
     ]
-    for word in noise_keywords:
-        content = content.replace(word, "")
+
+    for n in noise:
+        content = content.replace(n, "")
 
     content = re.sub(r"\s+", " ", content)
     return content.strip()
@@ -39,46 +42,45 @@ def extract_content(html):
 
 # ✅ PRIORITY DETECTION
 def detect_priority(text):
-    high_keywords = [
+    HIGH = [
         "appointment available",
         "select date",
         "calendar",
         "book now",
-        "schedule"
+        "schedule",
+        "choose date"
     ]
 
-    medium_keywords = [
+    MEDIUM = [
         "appointment",
         "book appointment",
         "start application",
-        "continue"
+        "continue",
+        "login"
     ]
 
-    for k in high_keywords:
+    for k in HIGH:
         if k in text:
             return "HIGH"
 
-    for k in medium_keywords:
+    for k in MEDIUM:
         if k in text:
             return "MEDIUM"
 
     return "LOW"
 
 
-# ✅ DIFF GENERATION
+# ✅ DIFF (SAFE + LIMITED)
 def generate_diff(old, new):
-    old_words = old.split()
-    new_words = new.split()
-
-    diff = list(difflib.ndiff(old_words, new_words))
+    diff = list(difflib.ndiff(old.split(), new.split()))
 
     added = [w[2:] for w in diff if w.startswith('+ ') and len(w) > 2]
     removed = [w[2:] for w in diff if w.startswith('- ') and len(w) > 2]
 
-    return " ".join(added[:15]), " ".join(removed[:15])
+    return " ".join(added[:12]), " ".join(removed[:12])
 
 
-# ✅ MAIN FUNCTION
+# ✅ MAIN CHECK
 def check_vfs(country):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -90,34 +92,31 @@ def check_vfs(country):
         html = page.content()
         browser.close()
 
-        current_content = extract_content(html)
+        current = extract_content(html)
 
-        # ✅ Load state
         with open("state.json", "r") as f:
             state = json.load(f)
 
         key = f"{country}_content"
-        previous_content = state.get(key, "")
+        previous = state.get(key, "")
 
-        # ✅ First run
-        if previous_content == "":
-            state[key] = current_content
-            with open("state.json", "w") as f:
-                json.dump(state, f)
+        # baseline
+        if previous == "":
+            state[key] = current
+            json.dump(state, open("state.json", "w"))
             return None
 
-        # ✅ Compare
-        if current_content != previous_content:
-            added, removed = generate_diff(previous_content, current_content)
+        # compare
+        if current != previous:
+            added, removed = generate_diff(previous, current)
 
-            state[key] = current_content
-            with open("state.json", "w") as f:
-                json.dump(state, f)
+            state[key] = current
+            json.dump(state, open("state.json", "w"))
 
             if not added and not removed:
                 return None
 
-            combined = (added + " " + removed).strip()
+            combined = f"{added} {removed}"
             priority = detect_priority(combined)
 
             return {
