@@ -6,25 +6,35 @@ from check_vfs import check_vfs
 from check_tls import check_germany_tls
 
 
-# ✅ Check VFS countries (France, Italy, Spain, Netherlands)
+# ✅ Priority icons
+PRIORITY_ICONS = {
+    "HIGH": "🔴",
+    "MEDIUM": "🟡",
+    "LOW": "🟢"
+}
+
+
+# ✅ Handle VFS countries
 def check_country(country):
     try:
         result = check_vfs(country)
 
         if result:
-            message = f"🚨 {country.upper()} UPDATE:\n"
+            priority = result.get("priority", "LOW")
+            icon = PRIORITY_ICONS.get(priority, "🟢")
 
-            # ✅ Show added content
+            message = f"{icon} {country.upper()} UPDATE ({priority} PRIORITY):\n"
+
+            # ✅ Added content
             if result.get("added"):
                 message += f"\n✅ Added:\n{result['added']}\n"
 
-            # ✅ Show removed content
+            # ✅ Removed content
             if result.get("removed"):
                 message += f"\n❌ Removed:\n{result['removed']}\n"
 
             notify(message)
-
-            print(f"{country}: change detected")
+            print(f"{country}: change detected ({priority})")
 
         else:
             print(f"{country}: no change")
@@ -33,24 +43,22 @@ def check_country(country):
         print(f"{country} error:", e)
 
 
-# ✅ Check Germany (TLS workaround)
+# ✅ Handle Germany (TLS)
 def check_germany():
     try:
         result = check_germany_tls()
 
         if result:
+            # Germany currently does not have priority logic
             message = "🚨 GERMANY (TLS) UPDATE:\n"
 
-            # ✅ Added
             if result.get("added"):
                 message += f"\n✅ Added:\n{result['added']}\n"
 
-            # ✅ Removed
             if result.get("removed"):
                 message += f"\n❌ Removed:\n{result['removed']}\n"
 
             notify(message)
-
             print("germany: change detected")
 
         else:
@@ -60,16 +68,16 @@ def check_germany():
         print("germany error:", e)
 
 
-# ✅ VFS Countries list
+# ✅ Countries list
 vfs_countries = ["france", "italy", "spain", "netherlands"]
 
 
-# ✅ Run VFS checks
+# ✅ Run all VFS checks
 for country in vfs_countries:
     check_country(country)
-    time.sleep(random.randint(4, 8))
+    time.sleep(random.randint(4, 8))  # avoid detection
 
 
-# ✅ Run Germany TLS check separately
+# ✅ Run Germany check separately
 time.sleep(random.randint(4, 8))
 check_germany()
